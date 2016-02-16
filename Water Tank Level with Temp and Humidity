@@ -1,0 +1,188 @@
+// This #include statement was automatically added by the Particle IDE.
+#include "SparkFunRHT03/SparkFunRHT03.h"
+
+// This #include statement was automatically added by the Particle IDE.
+#include "thingspeak/thingspeak.h"
+ThingSpeakLibrary::ThingSpeak thingspeak ("9WX95THO4VA5U808");
+
+//HC-SR04 PINS & VARIABLE
+#define trigPin D5
+#define echoPin D6
+int waterLevel = 0;
+
+//AM2302 PINS & VARIABLE
+const int RHT03_DATA_PIN = D3; // RHT03 data pin
+RHT03 rht; // This creates a RTH03 object, which we'll use to interact with the sensor
+//float latestHumidity;
+//float latestTempC;
+
+
+//SMOOTHING
+const int numReadings = 10;
+int readings[numReadings];      // the readings from the analog input
+int readIndex = 0;              // the index of the current reading
+int total = 0;                  // the running total
+int average = 0;                // the average
+int readingsTemp[numReadings];      // the readings from the analog input
+int readIndexTemp = 0;              // the index of the current reading
+int totalTemp = 0;                  // the running total
+int averageTemp = 0;                // the average
+int readingsHumi[numReadings];      // the readings from the analog input
+int readIndexHumi = 0;              // the index of the current reading
+int totalHumi = 0;                  // the running total
+int averageHumi = 0;                // the average
+
+
+void setup() {
+    Serial.begin (57600);
+    
+    //AM2302
+	rht.begin(RHT03_DATA_PIN); // Call rht.begin() to initialize the sensor and our data pin
+    
+    //HC-SR04  
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+      
+    //SMOOTHING - INITIALISE READING TO 0
+    for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+        readings[thisReading] = 0;
+    }
+}
+
+
+
+void loop() {
+    
+    //HC-SR04-READING
+    
+    long duration, distance;
+    digitalWrite(trigPin, LOW);  // Added this line
+    delayMicroseconds(2); // Added this line
+    digitalWrite(trigPin, HIGH); //delayMicroseconds(1000); - Removed this line
+    delayMicroseconds(10); // Added this line
+    digitalWrite(trigPin, LOW);
+    duration = pulseIn(echoPin, HIGH);
+    distance = (duration/2) / 29.1;
+    
+    if (distance >=300 || distance <= 0) {
+        Serial.println("Out of range");
+    }
+    else {
+        Serial.print("D ");
+        Serial.println(distance);
+    }
+    delay(500);
+
+      
+    //HC-SR04-SMOOTHING-RESULT
+    
+    total = total - readings[readIndex]; // subtract the last reading
+    readings[readIndex] = distance; // read from the sensor:
+    total = total + readings[readIndex];// add the reading to the total:
+    readIndex = readIndex + 1; // advance to the next position in the array:
+        
+    if (readIndex >= numReadings) { // if we're at the end of the array...
+        readIndex = 0; // ...wrap around to the beginning:
+    }
+
+    average = total / numReadings;       // calculate the average:
+    Serial.print("A ");
+    Serial.println(average);       // send it to the computer as ASCII digits
+    delay(1);        // delay in between reads for stability
+    
+    
+    //WATER-TANK-LEVEL
+    
+    waterLevel = 100 - average; // Change from distance from sensor to water level - Tank height 100cm
+    Serial.print("L ");
+    Serial.println(waterLevel);       // send it to the computer as ASCII digits
+    
+    
+    //AM2303 READING
+    
+	int updateRet = rht.update(); // Call rht.update() to get new humidity and temperature values from the sensor.
+	
+	// If successful, the update() function will return 1.
+	// If update fails, it will return a value <0
+	if (updateRet == 1)
+	{
+		// The humidity(), tempC(), and tempF() functions can be called -- after 
+		// a successful update() -- to get the last humidity and temperature
+		// value 
+		float latestHumidity = rht.humidity();
+		float latestTempC = rht.tempC();
+		//float latestTempF = rht.tempF();
+		
+		// Now print the values:
+		Serial.println("Humidity: " + String(latestHumidity, 1) + " %");
+		//Serial.println("Temp (F): " + String(latestTempF, 1) + " deg F");
+		Serial.println("Temp (C): " + String(latestTempC, 1) + " deg C");
+		
+		    //AM2302-SMOOTHING-RESULT-TEMERATURE
+    
+    totalTemp = totalTemp - readingsTemp[readIndexTemp]; // subtract the last reading
+    readingsTemp[readIndexTemp] = (int)latestTempC; // read from the sensor:
+    totalTemp = totalTemp + readingsTemp[readIndexTemp];// add the reading to the total:
+    readIndexTemp = readIndexTemp + 1; // advance to the next position in the array:
+        
+    if (readIndexTemp >= numReadings) { // if we're at the end of the array...
+        readIndexTemp = 0; // ...wrap around to the beginning:
+    }
+
+    averageTemp = totalTemp / numReadings;       // calculate the average:
+    Serial.print("AT ");
+    Serial.println(averageTemp);       // send it to the computer as ASCII digits
+    //delay(1);        // delay in between reads for stability
+    
+    
+    //SMOOTHING-RESULT-HUMIDITY
+    
+    totalHumi = totalHumi - readingsHumi[readIndexHumi]; // subtract the last reading
+    readingsHumi[readIndexHumi] = (int)latestHumidity; // read from the sensor:
+    totalHumi = totalHumi + readingsHumi[readIndexHumi];// add the reading to the total:
+    readIndexHumi = readIndexHumi + 1; // advance to the next position in the array:
+        
+    if (readIndexHumi >= numReadings) { // if we're at the end of the array...
+        readIndexHumi = 0; // ...wrap around to the beginning:
+    }
+
+    averageHumi = totalHumi / numReadings;       // calculate the average:
+    Serial.print("AH ");
+    Serial.println(averageHumi);       // send it to the computer as ASCII digits
+    //delay(1);        // delay in between reads for stability
+    
+    bool valSet3 = thingspeak.recordValue(3, String(averageTemp, DEC));
+    if(valSet3) { Serial.println("Value set to field 3 : " + String(averageTemp, DEC)); } else { Serial.println("Value not set successfully"); }
+    
+    bool valSet4 = thingspeak.recordValue(4, String(averageHumi, DEC));
+    if(valSet4) { Serial.println("Value set to field 4 : " + String(averageHumi, DEC)); } else { Serial.println("Value not set successfully"); }
+    
+    
+	}
+	else
+	{
+		// If the update failed, try delaying for RHT_READ_INTERVAL_MS ms before
+		// trying again.
+		delay(RHT_READ_INTERVAL_MS);
+	}
+	
+    
+
+    
+    
+    //THINGSPEAK-DATA-SEND
+
+    bool valSet1 = thingspeak.recordValue(1, String(average, DEC));
+    if(valSet1) { Serial.println("Value set to field 1 : " + String(average, DEC)); } else { Serial.println("Value not set successfully"); }
+    
+    bool valSet2 = thingspeak.recordValue(2, String(waterLevel, DEC));
+    if(valSet2) { Serial.println("Value set to field 2 : " + String(waterLevel, DEC)); } else { Serial.println("Value not set successfully"); }
+    
+
+    
+    bool valsSent = thingspeak.sendValues();
+    if(valsSent) { Serial.println("Value successfully sent to thingspeak"); } else { Serial.println("Sending to thingspeak failed"); }
+    
+    delay(16000);
+      
+}
