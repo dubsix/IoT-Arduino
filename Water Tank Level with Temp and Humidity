@@ -167,8 +167,6 @@ void loop() {
 	}
 	
     
-
-    
     
     //THINGSPEAK-DATA-SEND
 
@@ -178,11 +176,10 @@ void loop() {
     bool valSet2 = thingspeak.recordValue(2, String(waterLevel, DEC));
     if(valSet2) { Serial.println("Value set to field 2 : " + String(waterLevel, DEC)); } else { Serial.println("Value not set successfully"); }
     
-
     
     bool valsSent = thingspeak.sendValues();
     if(valsSent) { Serial.println("Value successfully sent to thingspeak"); } else { Serial.println("Sending to thingspeak failed"); }
     
-    delay(16000);
+    delay(15000);
       
 }
