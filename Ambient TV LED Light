@@ -1,0 +1,56 @@
+// ---------------------------------------------------------------
+// Plasma TV Spark Controller
+// 
+// FUNCTIONS:
+// 1. Ambient LED Lights Controller
+// 2. Controled via Particle REST api Post call or hardware button
+// ---------------------------------------------------------------
+
+// constants won't change. They're used here to set pin numbers
+const int ledSwitch = D7;
+const int digButton = D6;
+int buttonState = 0; // variable for reading the pushbutton status
+
+void setup() {
+
+    pinMode(ledSwitch, OUTPUT);
+    pinMode(digButton, INPUT);
+    
+    // Declare a Spark.Function to use with Cloud Service
+    // Cloud function "led" when called will run function ledToggle()
+    Spark.function("led", ledToggle);
+    
+    // Set led to Off when booted
+    digitalWrite(ledSwitch, LOW);
+    
+    Spark.publish("Hello World", "I'm alive");
+    
+}
+
+void loop() {
+
+    buttonState = digitalRead(digButton);
+    if(buttonState == LOW){
+        digitalWrite(ledSwitch, !digitalRead(ledSwitch));
+    }
+
+    delay(150);
+}
+
+// Function to handle Particle REST POST call
+int ledToggle(String command) {
+    
+    if (command=="on") {
+        digitalWrite(ledSwitch, HIGH);
+        Spark.publish("Ambient light activated");
+        return 1;
+    }
+    else if (command=="off") {
+        digitalWrite(ledSwitch, LOW);
+        Spark.publish("Ambient light deactivated");
+        return 0;
+    }
+    else {
+        return -1;
+    }
+}
